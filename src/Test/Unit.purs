@@ -18,6 +18,8 @@ module Test.Unit
 
 import Prelude
 
+import Control.Monad.Eff.Class (liftEff)
+import Test.Unit.Console (print)
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff, attempt, makeAff, forkAff, cancelWith)
 import Control.Monad.Aff.AVar (makeVar, killVar, putVar, takeVar, AVAR)
@@ -30,6 +32,7 @@ import Data.Foldable (foldl)
 import Data.List (snoc, singleton, List(Nil))
 import Data.Traversable (for)
 import Data.Tuple (Tuple(Tuple))
+import Debug.Trace (spy)
 
 foreign import data TIMER :: !
 
@@ -53,6 +56,7 @@ pickFirst t1 t2 = do
   va <- makeVar
   c1 <- forkAff $ attempt t1 >>= either (killVar va) (putVar va)
   c2 <- forkAff $ attempt t2 >>= either (killVar va) (putVar va)
+  let k = spy "_pickFirst_"
   (takeVar va) `cancelWith` (c1 <> c2)
 
 -- | Set a test to fail after a given number of milliseconds.
@@ -77,11 +81,17 @@ instance functorTestF :: Functor (TestF e) where
 -- | Define a test suite, which can contain a number of nested suites
 -- | as well as tests.
 suite :: forall e. String -> TestSuite e -> TestSuite e
-suite label tests = liftF $ TestGroup (Group label tests) unit
+suite label tests = do
+--  let k = spy "_suite_"
+--  let z = spy label
+--  let z2 = spy tests
+  liftF $ TestGroup (Group label tests) unit
 
 -- | Define a labelled test.
 test :: forall e. String -> Test e -> TestSuite e
-test l t = liftF $ TestUnit l t unit
+test l t = do
+--  let k = spy "_test_"
+  liftF $ TestUnit l t unit
 
 
 
@@ -89,15 +99,24 @@ test l t = liftF $ TestUnit l t unit
 collectTests :: forall e. TestSuite e -> List (Tuple (List String) (Test e))
 collectTests = execWriter <<< runFreeM (runSuiteItem Nil)
   where runSuiteItem path (TestUnit label t rest) = do
+          let k = spy "_collectTests TestUnit_"
           tell $ singleton $ Tuple (snoc path label) t
           pure rest
         runSuiteItem path (TestGroup (Group label children) rest) = do
+          let k = spy "_collectTests TestGroup_"
           runFreeM (runSuiteItem (snoc path label)) children
           pure rest
 
 -- | Run a test suite and collect each test result in a flat list.
 collectResults :: forall e. TestSuite e -> Aff e (List (Tuple (List String) (Either Error Unit)))
-collectResults tests = for (collectTests tests) run
+collectResults tests = do
+  let k = spy "_collectResults_"
+  let z = spy tests
+  for (collectTests tests) $ \_ -> do
+    let z2 = spy "for"
+    pure unit
+--  pure Nil
+  for (collectTests tests) run
   where run (Tuple label t) = Tuple label <$> attempt t
 
 -- | Filter successes out of a list of test results.
@@ -108,4 +127,9 @@ keepErrors = foldl run Nil
 
 -- | Run a test suite and collect failing tests in a flat list.
 collectErrors :: forall e. TestSuite e -> Aff e (List (Tuple (List String) Error))
-collectErrors = collectResults >>> map keepErrors
+-- collectErrors = collectResults >>> map keepErrors
+collectErrors t = do
+  let k = spy "_collectErrors_"
+  (map keepErrors <$> collectResults) t
+--  pure (map keepErrors z)
+--  collectResults >>> map keepErrors

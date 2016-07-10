@@ -2,6 +2,8 @@ module Test.Unit.Output.Fancy
   ( runTest
   ) where
 
+import Debug.Trace (spy)
+import Control.Monad.Eff.Class (liftEff)
 import Prelude
 import Control.Monad.Aff (attempt, Aff)
 import Control.Monad.Eff.Class (liftEff)
@@ -21,7 +23,9 @@ indent 0 = mempty
 indent n = "  " <> indent (n - 1)
 
 printLive :: forall e. TestSuite (testOutput :: TESTOUTPUT | e) -> Aff (testOutput :: TESTOUTPUT | e) Unit
-printLive t = runSuite 0 t
+printLive t = do
+  let k = spy "printLive"
+  runSuite 0 t
   where
     runSuite level suite = runFreeM (runSuiteItem level) suite
 
@@ -58,7 +62,9 @@ printLive t = runSuite 0 t
 
 printErrors :: forall e. TestSuite (testOutput :: TESTOUTPUT | e) -> Aff (testOutput :: TESTOUTPUT | e) Unit
 printErrors suite = do
+  let z = spy "printErrors"
   errors <- collectErrors suite
+  let k = spy "errors"
   liftEff do
     case length errors of
       0 -> pure unit
@@ -84,5 +90,7 @@ printErrors suite = do
 
 runTest :: forall e. TestSuite (testOutput :: TESTOUTPUT | e) -> Aff (testOutput :: TESTOUTPUT | e) Unit
 runTest suite = do
+  let k = spy "Fancy runTest"
   printLive suite
   printErrors suite
+  pure unit

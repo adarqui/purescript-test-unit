@@ -5,6 +5,7 @@ module Test.Unit.Main
   , exit
   ) where
 
+import Debug.Trace (spy)
 import Prelude
 import Control.Monad.Aff (runAff, Aff)
 import Control.Monad.Eff (Eff)
@@ -32,13 +33,16 @@ run e = do
 -- | Run a test suite using the provided test runner.
 runTestWith  :: forall e. (TestSuite (console :: CONSOLE | e) -> Aff (console :: CONSOLE | e) Unit) -> TestSuite (console :: CONSOLE | e) -> Eff (console :: CONSOLE | e) Unit
 runTestWith runner suite = run $ do
+  let k = spy "runTestWith"
   runner suite
   errs <- collectErrors suite
   if length errs > 0 then liftEff (exit 1) else pure unit
 
 -- | Run a test suite, picking the most appropriate test runner.
 runTest :: forall e. TestSuite (console :: CONSOLE, testOutput :: TESTOUTPUT | e) -> Eff (console :: CONSOLE, testOutput :: TESTOUTPUT | e) Unit
-runTest suite = runTestWith runner suite
+runTest suite = do
+  let k = spy "runTest"
+  runTestWith runner suite
   where runner = if TAP.requested
                  then TAP.runTest
                  else if hasStderr && hasColours
